@@ -1,86 +1,114 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-<meta charset="UTF-8">
-<title>Velocity–Time Graph: Ramp & Bumper Experiment (Negative Initial Direction)</title>
-<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
-<style>
-  body { font-family: Arial, sans-serif; margin: 20px; }
-  #graph { width: 100%; max-width: 900px; height: 600px; }
-</style>
+  <meta charset="utf-8" />
+  <title>Vehicle Bounce v–t Graphs</title>
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 </head>
 <body>
-<h2>Velocity–Time Graph: Vehicle Released from Ramp (Initial Direction Negative)</h2>
-<div id="graph"></div>
-<script>
-// Key times (s) and velocities (m/s) — reversed sign
-const t0 = 0.0, t1 = 1.0, t2 = 3.2, tEnd = 6.0;
-const v0 = -0.0, v1 = -2.0, v1After = 1.6, v2 = -1.2, v2After = 0.72;
+  <h2 style="text-align:center;">Velocity–Time Graph: Vehicle Bouncing off Styrofoam Bumper</h2>
+  <div id="plot" style="width:95%;max-width:1200px;margin:auto;"></div>
 
-// Generate segments
-function linspace(start, stop, num) {
-    const arr = [];
-    const step = (stop - start) / (num - 1);
-    for (let i = 0; i < num; i++) arr.push(start + step * i);
-    return arr;
+<script>
+// Parameters
+const initialVelocity = 2; // m/s
+const bounceCount = 6;     // total bounces
+const timePerLeg = 1;      // seconds between events
+const damping = 0.6;       // velocity reduction per bounce
+
+// Function to generate v–t data
+function generateVT(initialV, bounceCount, timePerLeg, damping) {
+    let t = [0];
+    let v = [initialV];
+    let labels = {};
+    let currentV = initialV;
+    let time = 0;
+    let eventNames = ["Initial release", "First impact", "First separation", "Second impact", "Second separation"];
+    let labelIndex = 0;
+
+    // Initial release label
+    labels[time] = eventNames[labelIndex++];
+
+    for (let i = 0; i < bounceCount; i++) {
+        // Impact
+        time += timePerLeg;
+        currentV = -currentV; // instant reversal
+        t.push(time);
+        v.push(currentV);
+        if (labelIndex < eventNames.length) labels[time] = eventNames[labelIndex++];
+
+        // Separation
+        time += timePerLeg;
+        currentV = currentV * damping; // reduce amplitude
+        t.push(time);
+        v.push(currentV);
+        if (labelIndex < eventNames.length) labels[time] = eventNames[labelIndex++];
+    }
+    return {t, v, labels};
 }
 
-// Segment 1: accelerate down ramp toward bumper (negative velocity)
-let t_seg1 = linspace(t0, t1, 100);
-let v_seg1 = t_seg1.map(t => v0 + (v1 - v0) * (t - t0) / (t1 - t0));
+let posData = generateVT(initialVelocity, bounceCount, timePerLeg, damping);
+let negData = generateVT(-initialVelocity, bounceCount, timePerLeg, damping);
 
-// Segment 2: after first separation to just before second impact
-let t_seg2 = linspace(t1 + 0.002, t2 - 0.002, 150);
-let v_seg2 = t_seg2.map(t => v1After + (v2 - v1After) * (t - (t1 + 0.002)) / (t2 - t1 - 0.004));
+// Function to create trace for main curve
+function createTrace(data, name, color) {
+    return {
+        x: data.t,
+        y: data.v,
+        mode: 'lines+markers',
+        name: name,
+        line: {color: color},
+        marker: {size: 6}
+    };
+}
 
-// Segment 3: after second separation to rest
-let t_seg3 = linspace(t2 + 0.002, tEnd, 200);
-let decayRate = 0.9;
-let v_seg3 = t_seg3.map(t => v2After * Math.exp(-decayRate * (t - (t2 + 0.002))));
+// Function to create annotation points
+function createAnnotations(data) {
+    let annots = [];
+    for (let tVal in data.labels) {
+        annots.push({
+            x: parseFloat(tVal),
+            y: data.v[data.t.indexOf(parseFloat(tVal))],
+            xref: 'x',
+            yref: 'y',
+            text: data.labels[tVal],
+            showarrow: true,
+            arrowhead: 2,
+            ax: 0,
+            ay: -30
+        });
+    }
+    return annots;
+}
 
-// Combine for continuous plot
-let t_all = [].concat(
-    t_seg1, [t1 - 0.001, t1 + 0.001], t_seg2, [t2 - 0.001, t2 + 0.001], t_seg3
-);
-let v_all = [].concat(
-    v_seg1, [v1, v1After], v_seg2, [v2, v2After], v_seg3
-);
-
-// Main line trace
-let trace1 = {
-    x: t_all,
-    y: v_all,
-    mode: 'lines',
-    name: 'Velocity',
-    line: { color: 'blue', width: 2 }
-};
-
-// Event markers
-let events = [
-    {label: 'Initial release', time: t0, vel: v0},
-    {label: 'First impact', time: t1, vel: v1},
-    {label: 'First separation', time: t1 + 0.01, vel: v1After},
-    {label: 'Second impact', time: t2, vel: v2},
-    {label: 'Second separation', time: t2 + 0.01, vel: v2After}
-];
-let trace2 = {
-    x: events.map(e => e.time),
-    y: events.map(e => e.vel),
-    mode: 'markers+text',
-    name: 'Events',
-    text: events.map(e => e.label),
-    textposition: 'top center',
-    marker: { size: 8, color: 'red' }
-};
+let tracePos = createTrace(posData, "Initial velocity positive", "blue");
+let traceNeg = createTrace(negData, "Initial velocity negative", "red");
 
 let layout = {
-    xaxis: { title: 'Time (s)', zeroline: false },
-    yaxis: { title: 'Velocity (m/s)', zeroline: true },
-    title: 'Vehicle Released from Ramp: Bounces on Styrofoam Bumper (Negative Initial Direction)',
-    hovermode: 'closest'
+    grid: {rows: 1, columns: 2, pattern: 'independent'},
+    annotations: [],
+    height: 500,
+    width: 1200,
+    title: "Vehicle Released from Ramp, Bouncing until Stop",
 };
 
-Plotly.newPlot('graph', [trace1, trace2], layout);
+let figData = [
+    {...tracePos, xaxis: 'x1', yaxis: 'y1'},
+    {...traceNeg, xaxis: 'x2', yaxis: 'y2'}
+];
+
+// Apply annotations separately for each subplot
+let annotsPos = createAnnotations(posData).map(a => ({...a, xref:'x1', yref:'y1'}));
+let annotsNeg = createAnnotations(negData).map(a => ({...a, xref:'x2', yref:'y2'}));
+layout.annotations = annotsPos.concat(annotsNeg);
+
+// Axis settings
+layout.xaxis = {title: "Time (s)", range: [0, (bounceCount+1)*timePerLeg*2]};
+layout.yaxis = {title: "Velocity (m/s)", zeroline: true};
+layout.xaxis2 = {title: "Time (s)", range: [0, (bounceCount+1)*timePerLeg*2]};
+layout.yaxis2 = {title: "Velocity (m/s)", zeroline: true};
+
+Plotly.newPlot('plot', figData, layout);
 </script>
 </body>
 </html>
