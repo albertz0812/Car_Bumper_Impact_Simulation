@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Velocity–Time Graph: Ramp & Bumper Experiment</title>
+<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+<style>
+  body { font-family: Arial, sans-serif; margin: 20px; }
+  #graph { width: 100%; max-width: 900px; height: 600px; }
+</style>
+</head>
+<body>
+<h2>Velocity–Time Graph: Vehicle Released from Ramp & Bouncing on Styrofoam Bumper</h2>
+<div id="graph"></div>
+<script>
+// Key times (s) and velocities (m/s)
+const t0 = 0.0, t1 = 1.0, t2 = 3.2, tEnd = 6.0;
+const v0 = 0.0, v1 = 2.0, v1After = -1.6, v2 = 1.2, v2After = -0.72;
+
+// Generate segments
+function linspace(start, stop, num) {
+    const arr = [];
+    const step = (stop - start) / (num - 1);
+    for (let i = 0; i < num; i++) arr.push(start + step * i);
+    return arr;
+}
+
+// Segment 1: accelerate down ramp
+let t_seg1 = linspace(t0, t1, 100);
+let v_seg1 = t_seg1.map(t => v0 + (v1 - v0) * (t - t0) / (t1 - t0));
+
+// Segment 2: after first separation to just before second impact
+let t_seg2 = linspace(t1 + 0.002, t2 - 0.002, 150);
+let v_seg2 = t_seg2.map(t => v1After + (v2 - v1After) * (t - (t1 + 0.002)) / (t2 - t1 - 0.004));
+
+// Segment 3: after second separation to rest
+let t_seg3 = linspace(t2 + 0.002, tEnd, 200);
+let decayRate = 0.9;
+let v_seg3 = t_seg3.map(t => v2After * Math.exp(-decayRate * (t - (t2 + 0.002))));
+
+// Combine for continuous plot
+let t_all = [].concat(
+    t_seg1, [t1 - 0.001, t1 + 0.001], t_seg2, [t2 - 0.001, t2 + 0.001], t_seg3
+);
+let v_all = [].concat(
+    v_seg1, [v1, v1After], v_seg2, [v2, v2After], v_seg3
+);
+
+// Main line trace
+let trace1 = {
+    x: t_all,
+    y: v_all,
+    mode: 'lines',
+    name: 'Velocity',
+    line: { color: 'blue', width: 2 }
+};
+
+// Event markers
+let events = [
+    {label: 'Initial release', time: t0, vel: v0},
+    {label: 'First impact', time: t1, vel: v1},
+    {label: 'First separation', time: t1 + 0.01, vel: v1After},
+    {label: 'Second impact', time: t2, vel: v2},
+    {label: 'Second separation', time: t2 + 0.01, vel: v2After}
+];
+let trace2 = {
+    x: events.map(e => e.time),
+    y: events.map(e => e.vel),
+    mode: 'markers+text',
+    name: 'Events',
+    text: events.map(e => e.label),
+    textposition: 'top center',
+    marker: { size: 8, color: 'red' }
+};
+
+let layout = {
+    xaxis: { title: 'Time (s)', zeroline: false },
+    yaxis: { title: 'Velocity (m/s)', zeroline: true },
+    title: 'Vehicle Released from Ramp: Bounces on Styrofoam Bumper',
+    hovermode: 'closest'
+};
+
+Plotly.newPlot('graph', [trace1, trace2], layout);
+</script>
+</body>
+</html>
