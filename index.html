@@ -6,40 +6,50 @@
   <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 </head>
 <body>
-  <h2 style="text-align:center;">Velocity–Time Graph: Vehicle Bouncing off Styrofoam Bumper</h2>
+  <h2 style="text-align:center;">Velocity–Time Graph: Vehicle Released from Ramp (Initial v = 0)</h2>
   <div id="plot" style="width:95%;max-width:1200px;margin:auto;"></div>
 
 <script>
 // Parameters
-const initialVelocity = 2; // m/s
-const bounceCount = 6;     // total bounces
-const timePerLeg = 1;      // seconds between events
-const damping = 0.6;       // velocity reduction per bounce
+const firstPeakVelocity = 2; // m/s after ramp acceleration
+const bounceCount = 6;       // total bounces
+const timePerLeg = 1;        // seconds between events
+const damping = 0.6;         // velocity reduction per bounce
 
-// Function to generate v–t data
-function generateVT(initialV, bounceCount, timePerLeg, damping) {
+function generateVT(firstPeakV, bounceCount, timePerLeg, damping, direction = 1) {
     let t = [0];
-    let v = [initialV];
+    let v = [0]; // starts at rest
     let labels = {};
-    let currentV = initialV;
     let time = 0;
-    let eventNames = ["Initial release", "First impact", "First separation", "Second impact", "Second separation"];
-    let labelIndex = 0;
+    let currentV = firstPeakV * direction;
 
-    // Initial release label
-    labels[time] = eventNames[labelIndex++];
+    let eventNames = [
+        "Initial release",
+        "First impact",
+        "First separation",
+        "Second impact",
+        "Second separation"
+    ];
+    let labelIndex = 0;
+    labels[time] = eventNames[labelIndex++]; // label at t=0
+
+    // Accelerate to first impact
+    time += timePerLeg;
+    t.push(time);
+    v.push(currentV);
+    if (labelIndex < eventNames.length) labels[time] = eventNames[labelIndex++];
 
     for (let i = 0; i < bounceCount; i++) {
-        // Impact
+        // Impact reversal
         time += timePerLeg;
-        currentV = -currentV; // instant reversal
+        currentV = -currentV; // reverse direction instantly
         t.push(time);
         v.push(currentV);
         if (labelIndex < eventNames.length) labels[time] = eventNames[labelIndex++];
 
-        // Separation
+        // Separation with damping
         time += timePerLeg;
-        currentV = currentV * damping; // reduce amplitude
+        currentV *= damping;
         t.push(time);
         v.push(currentV);
         if (labelIndex < eventNames.length) labels[time] = eventNames[labelIndex++];
@@ -47,10 +57,9 @@ function generateVT(initialV, bounceCount, timePerLeg, damping) {
     return {t, v, labels};
 }
 
-let posData = generateVT(initialVelocity, bounceCount, timePerLeg, damping);
-let negData = generateVT(-initialVelocity, bounceCount, timePerLeg, damping);
+let posData = generateVT(firstPeakVelocity, bounceCount, timePerLeg, damping, 1);
+let negData = generateVT(firstPeakVelocity, bounceCount, timePerLeg, damping, -1);
 
-// Function to create trace for main curve
 function createTrace(data, name, color) {
     return {
         x: data.t,
@@ -62,15 +71,14 @@ function createTrace(data, name, color) {
     };
 }
 
-// Function to create annotation points
-function createAnnotations(data) {
+function createAnnotations(data, subplot) {
     let annots = [];
     for (let tVal in data.labels) {
         annots.push({
             x: parseFloat(tVal),
             y: data.v[data.t.indexOf(parseFloat(tVal))],
-            xref: 'x',
-            yref: 'y',
+            xref: subplot === 1 ? 'x1' : 'x2',
+            yref: subplot === 1 ? 'y1' : 'y2',
             text: data.labels[tVal],
             showarrow: true,
             arrowhead: 2,
@@ -81,32 +89,28 @@ function createAnnotations(data) {
     return annots;
 }
 
-let tracePos = createTrace(posData, "Initial velocity positive", "blue");
-let traceNeg = createTrace(negData, "Initial velocity negative", "red");
+let tracePos = createTrace(posData, "Ramp release → Positive direction", "blue");
+let traceNeg = createTrace(negData, "Ramp release → Negative direction", "red");
 
 let layout = {
     grid: {rows: 1, columns: 2, pattern: 'independent'},
-    annotations: [],
     height: 500,
     width: 1200,
     title: "Vehicle Released from Ramp, Bouncing until Stop",
+    xaxis: {title: "Time (s)", range: [0, (bounceCount+2)*timePerLeg]},
+    yaxis: {title: "Velocity (m/s)", zeroline: true},
+    xaxis2: {title: "Time (s)", range: [0, (bounceCount+2)*timePerLeg]},
+    yaxis2: {title: "Velocity (m/s)", zeroline: true},
+    annotations: [
+        ...createAnnotations(posData, 1),
+        ...createAnnotations(negData, 2)
+    ]
 };
 
 let figData = [
     {...tracePos, xaxis: 'x1', yaxis: 'y1'},
     {...traceNeg, xaxis: 'x2', yaxis: 'y2'}
 ];
-
-// Apply annotations separately for each subplot
-let annotsPos = createAnnotations(posData).map(a => ({...a, xref:'x1', yref:'y1'}));
-let annotsNeg = createAnnotations(negData).map(a => ({...a, xref:'x2', yref:'y2'}));
-layout.annotations = annotsPos.concat(annotsNeg);
-
-// Axis settings
-layout.xaxis = {title: "Time (s)", range: [0, (bounceCount+1)*timePerLeg*2]};
-layout.yaxis = {title: "Velocity (m/s)", zeroline: true};
-layout.xaxis2 = {title: "Time (s)", range: [0, (bounceCount+1)*timePerLeg*2]};
-layout.yaxis2 = {title: "Velocity (m/s)", zeroline: true};
 
 Plotly.newPlot('plot', figData, layout);
 </script>
